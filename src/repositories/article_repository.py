@@ -2,6 +2,17 @@ import math
 from typing import Any, Dict, List, Optional, Tuple
 from src.db import get_db_cursor
 
+ARTICLE_FIELDS = (
+    "title",
+    "slug",
+    "category_id",
+    "excerpt",
+    "author",
+    "read_time_minutes",
+    "status",
+    "published_at",
+)
+
 
 class ArticleRepository:
     @staticmethod
@@ -217,7 +228,8 @@ class ArticleRepository:
             )
         """
         with get_db_cursor() as cursor:
-            cursor.execute(sql, data)
+            article_data = {key: data[key] for key in ARTICLE_FIELDS if key in data}
+            cursor.execute(sql, article_data)
             article_id = cursor.lastrowid
 
             sections = data.get("sections", [])
