@@ -1,0 +1,781 @@
+openapi: 3.0.3
+info:
+  title: Código Femenino - API Backend
+  description: |
+    API REST para la plataforma **Código Femenino**, orientada al empoderamiento femenino, finanzas personales, desarrollo profesional, bienestar, salud y comunidad.
+    
+    ### Características principales:
+    - **Categorías temáticas:** Gestión y consulta de categorías editoriales.
+    - **Artículos y secciones:** Publicación, paginación, filtros por categoría y búsqueda textual.
+    - **Captación de leads:** Suscripción al newsletter general y descarga de guía gratuita/ebook.
+    - **Healthcheck:** Monitoreo del estado del servicio y conexión a la base de datos MySQL.
+  version: 1.0.0
+  contact:
+    name: Equipo Código Femenino
+    url: https://github.com/matuxvi7/codigo-femenino-backend
+servers:
+  - url: http://localhost:5000
+    description: Servidor de desarrollo local
+  - url: /
+    description: Servidor actual (relativo)
+
+tags:
+  - name: Health
+    description: Monitoreo y estado del servicio y la base de datos
+  - name: Categories
+    description: Categorías temáticas para organizar el contenido editorial
+  - name: Articles
+    description: Gestión y consulta de artículos, notas editoriales y sus secciones
+  - name: Leads
+    description: Captación de suscriptores, suscripción al newsletter y entrega de guía gratuita
+
+paths:
+  /api/health:
+    get:
+      tags:
+        - Health
+      summary: Chequeo de salud del backend y base de datos
+      description: Retorna el estado del servicio y verifica la conexión activa al pool de MySQL.
+      responses:
+        "200":
+          description: Servicio y base de datos funcionando correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        "503":
+          description: Servicio degradado o sin conexión a la base de datos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/categories:
+    get:
+      tags:
+        - Categories
+      summary: Listar todas las categorías
+      description: Retorna el listado completo de categorías disponibles ordenadas alfabéticamente.
+      responses:
+        "200":
+          description: Lista de categorías
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  count:
+                    type: integer
+                    example: 5
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+
+  /api/categories/{slug}:
+    get:
+      tags:
+        - Categories
+      summary: Obtener una categoría por slug
+      description: Devuelve el detalle de una categoría específica a partir de su identificador amigable (slug).
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: Slug de la categoría (ej. 'finanzas-personales')
+          schema:
+            type: string
+            example: finanzas-personales
+      responses:
+        "200":
+          description: Categoría encontrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Category'
+        "404":
+          description: Categoría no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/articles:
+    get:
+      tags:
+        - Articles
+      summary: Listar artículos con filtros y paginación
+      description: Retorna un listado paginado de artículos. Por defecto devuelve solo los artículos publicados.
+      parameters:
+        - name: category
+          in: query
+          required: false
+          description: Filtrar por slug de la categoría
+          schema:
+            type: string
+            example: finanzas-personales
+        - name: search
+          in: query
+          required: false
+          description: Búsqueda por palabras clave en título o extracto
+          schema:
+            type: string
+            example: ahorro
+        - name: status
+          in: query
+          required: false
+          description: Estado del artículo ('published', 'draft', 'archived' o 'all')
+          schema:
+            type: string
+            enum: [published, draft, archived, all]
+            default: published
+        - name: page
+          in: query
+          required: false
+          description: Número de página (base 1)
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          description: Cantidad de resultados por página (máximo 100)
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: Listado paginado de artículos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ArticleSummary'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+    post:
+      tags:
+        - Articles
+      summary: Crear un nuevo artículo con secciones
+      description: Registra un artículo en estado borrador o publicado, incluyendo opcionalmente sus secciones de contenido estructurado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArticleCreateInput'
+      responses:
+        "201":
+          description: Artículo creado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Artículo creado con éxito.
+                  data:
+                    $ref: '#/components/schemas/ArticleDetail'
+        "400":
+          description: Error de validación en los campos enviados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /api/articles/{slug}:
+    get:
+      tags:
+        - Articles
+      summary: Obtener el detalle completo de un artículo
+      description: Retorna toda la información del artículo y sus secciones de contenido ordenadas por posición.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: Slug único del artículo
+          schema:
+            type: string
+            example: 5-claves-para-tu-independencia-financiera
+        - name: preview
+          in: query
+          required: false
+          description: Si es true (o 1), permite visualizar borradores o artículos no publicados
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Detalle del artículo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/ArticleDetail'
+        "404":
+          description: Artículo no encontrado o no publicado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Articles
+      summary: Actualizar un artículo existente
+      description: Modifica los campos principales de un artículo o sus secciones.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: Slug actual del artículo a modificar
+          schema:
+            type: string
+            example: 5-claves-para-tu-independencia-financiera
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArticleUpdateInput'
+      responses:
+        "200":
+          description: Artículo actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Artículo actualizado con éxito.
+                  data:
+                    $ref: '#/components/schemas/ArticleDetail'
+        "400":
+          description: Error de validación en la actualización
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        "404":
+          description: Artículo no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Articles
+      summary: Eliminar un artículo
+      description: Elimina el artículo y sus secciones asociadas de la base de datos.
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          description: Slug del artículo a eliminar
+          schema:
+            type: string
+            example: 5-claves-para-tu-independencia-financiera
+      responses:
+        "200":
+          description: Artículo eliminado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: El artículo '5-claves-para-tu-independencia-financiera' ha sido eliminado exitosamente.
+        "404":
+          description: Artículo no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/leads:
+    get:
+      tags:
+        - Leads
+      summary: Listar registros de leads
+      description: Consulta los suscriptores captados, con opción de filtrar por origen.
+      parameters:
+        - name: source
+          in: query
+          required: false
+          description: Filtrar por canal de origen ('newsletter' o 'guia_gratuita')
+          schema:
+            type: string
+            enum: [newsletter, guia_gratuita]
+      responses:
+        "200":
+          description: Listado de leads registrados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  count:
+                    type: integer
+                    example: 24
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Lead'
+
+    post:
+      tags:
+        - Leads
+      summary: Registrar un lead / suscriptor
+      description: Registra o actualiza el registro de un usuario interesado en newsletter o guía gratuita. Si ya existía, actualiza fecha y origen.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeadInput'
+      responses:
+        "200":
+          description: Suscripción procesada correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeadActionResponse'
+        "400":
+          description: Error de validación en el correo o datos de suscripción
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /api/newsletter:
+    post:
+      tags:
+        - Leads
+      summary: Suscripción rápida al Newsletter general
+      description: Endpoint optimizado para el formulario de pie de página o popup del newsletter. Fuerza el origen a 'newsletter'.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: lectora@ejemplo.com
+                full_name:
+                  type: string
+                  example: Sofía Morales
+      responses:
+        "200":
+          description: Suscripción al newsletter confirmada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeadActionResponse'
+        "400":
+          description: Datos de suscripción no válidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /api/guia-gratuita:
+    post:
+      tags:
+        - Leads
+      summary: Solicitud de descarga de Guía Gratuita
+      description: Endpoint para la landing page de descarga del ebook o guía para mujeres profesionales. Fuerza el origen a 'guia_gratuita'.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: profesional@ejemplo.com
+                full_name:
+                  type: string
+                  example: Camila Fernández
+      responses:
+        "200":
+          description: Solicitud registrada y confirmación de envío
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeadActionResponse'
+        "400":
+          description: Datos de suscripción no válidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: codigo-femenino-backend
+        database:
+          type: object
+          properties:
+            status:
+              type: string
+              example: connected
+            message:
+              type: string
+              example: Conexión a MySQL exitosa
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Finanzas Personales
+        slug:
+          type: string
+          example: finanzas-personales
+        description:
+          type: string
+          example: Estrategias de ahorro, inversión y presupuesto para tu libertad económica.
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-01T12:00:00Z"
+
+    ArticleSection:
+      type: object
+      required:
+        - content
+      properties:
+        id:
+          type: integer
+          example: 10
+        position:
+          type: integer
+          default: 1
+          example: 1
+        heading:
+          type: string
+          nullable: true
+          example: "1. Define tu fondo de emergencia"
+        content:
+          type: string
+          example: "El primer paso consiste en reservar entre 3 y 6 meses de tus gastos fijos..."
+
+    ArticleSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: "5 claves para tu independencia financiera"
+        slug:
+          type: string
+          example: "5-claves-para-tu-independencia-financiera"
+        category_id:
+          type: integer
+          example: 1
+        category_name:
+          type: string
+          example: "Finanzas Personales"
+        category_slug:
+          type: string
+          example: "finanzas-personales"
+        excerpt:
+          type: string
+          example: "Descubre cómo tomar las riendas de tu dinero y construir un patrimonio sólido."
+        author:
+          type: string
+          example: "Redacción Código Femenino"
+        read_time_minutes:
+          type: integer
+          example: 6
+        status:
+          type: string
+          enum: [draft, published, archived]
+          example: published
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-03-05T15:00:00Z"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-04T10:00:00Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-03-05T15:00:00Z"
+
+    ArticleDetail:
+      allOf:
+        - $ref: '#/components/schemas/ArticleSummary'
+        - type: object
+          properties:
+            sections:
+              type: array
+              items:
+                $ref: '#/components/schemas/ArticleSection'
+
+    ArticleCreateInput:
+      type: object
+      required:
+        - title
+        - slug
+        - category_id
+        - excerpt
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          example: "5 claves para tu independencia financiera"
+        slug:
+          type: string
+          maxLength: 180
+          example: "5-claves-para-tu-independencia-financiera"
+        category_id:
+          type: integer
+          example: 1
+        excerpt:
+          type: string
+          example: "Descubre cómo tomar las riendas de tu dinero y construir un patrimonio sólido."
+        author:
+          type: string
+          maxLength: 160
+          default: "Redacción Código Femenino"
+          example: "Mariana Costa"
+        read_time_minutes:
+          type: integer
+          minimum: 1
+          maximum: 255
+          default: 5
+          example: 6
+        status:
+          type: string
+          enum: [draft, published, archived]
+          default: draft
+          example: published
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArticleSection'
+
+    ArticleUpdateInput:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 255
+        slug:
+          type: string
+          maxLength: 180
+        category_id:
+          type: integer
+        excerpt:
+          type: string
+        author:
+          type: string
+          maxLength: 160
+        read_time_minutes:
+          type: integer
+          minimum: 1
+          maximum: 255
+        status:
+          type: string
+          enum: [draft, published, archived]
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArticleSection'
+
+    Lead:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 101
+        email:
+          type: string
+          format: email
+          example: carla@ejemplo.com
+        full_name:
+          type: string
+          nullable: true
+          example: Carla Rossi
+        source:
+          type: string
+          enum: [newsletter, guia_gratuita]
+          example: newsletter
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-08T18:22:10Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-03-08T18:22:10Z"
+
+    LeadInput:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: carla@ejemplo.com
+        full_name:
+          type: string
+          maxLength: 160
+          nullable: true
+          example: Carla Rossi
+        source:
+          type: string
+          enum: [newsletter, guia_gratuita]
+          default: newsletter
+          example: newsletter
+
+    LeadActionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "¡Gracias por unirte a nuestra comunidad!"
+        data:
+          type: object
+          properties:
+            email:
+              type: string
+              example: carla@ejemplo.com
+            source:
+              type: string
+              example: newsletter
+            is_new:
+              type: boolean
+              example: true
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        per_page:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 35
+        total_pages:
+          type: integer
+          example: 4
+        has_next:
+          type: boolean
+          example: true
+        has_prev:
+          type: boolean
+          example: false
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: NOT_FOUND
+        message:
+          type: string
+          example: El recurso solicitado no fue encontrado.
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Datos no válidos.
+        details:
+          type: array
+          items:
+            type: string
+          example: ["El campo 'email' es obligatorio."]

@@ -11,6 +11,7 @@ El proyecto implementa una arquitectura por capas desacoplada:
 ```
 codigo-femenino-backend/
 ├── app.py                      # Punto de entrada y configuración de la app Flask
+├── openapi.yaml                # Especificación OpenAPI 3.0 completa de la API
 ├── requirements.txt            # Dependencias del proyecto
 ├── .env.example                # Plantilla de variables de entorno
 ├── scripts/
@@ -30,12 +31,22 @@ codigo-femenino-backend/
     │   ├── common.py
     │   ├── article_validators.py
     │   └── lead_validators.py
-    └── routes/                 # Controladores y endpoints REST (/api)
+    └── routes/                 # Controladores y endpoints REST
+        ├── docs.py             # Swagger UI interactivo (/docs y /docs/openapi.yaml)
         ├── health.py           # Estado de la API y de la conexión a MySQL
         ├── categories.py       # Endpoints de categorías
         ├── articles.py         # Endpoints de artículos, secciones y búsqueda
         └── leads.py            # Captación de newsletter y descarga de guía gratuita
 ```
+
+---
+
+## 📖 Documentación Interactiva (Swagger / OpenAPI)
+
+El backend incluye interfaz visual de Swagger UI y especificación estándar OpenAPI 3.0:
+
+- **Swagger UI interactivo:** `http://localhost:5000/docs` (permite probar todos los endpoints y schemas en vivo).
+- **Especificación OpenAPI 3.0 (YAML):** `http://localhost:5000/docs/openapi.yaml` (o directo en la raíz `openapi.yaml`, compatible para importar en Postman, Insomnia o Swagger Editor).
 
 ---
 
@@ -93,13 +104,13 @@ mysql -u root -p < scripts/init_db.sql
 ```bash
 python app.py
 ```
-El servidor quedará disponible en `http://localhost:5000`.
+El servidor quedará disponible en `http://localhost:5000` y la documentación en `http://localhost:5000/docs`.
 
 ---
 
 ## 📡 Referencia de Endpoints de la API
 
-Todos los endpoints están prefijados con `/api`.
+Todos los endpoints están prefijados con `/api` (a excepción de la documentación en `/docs`).
 
 ### 1. Estado del Sistema
 - `GET /api/health`: Comprueba el estado del servicio y la conectividad activa con MySQL.
@@ -114,8 +125,8 @@ Todos los endpoints están prefijados con `/api`.
   - `search`: búsqueda de texto en título o resumen (ej. `?search=limites`)
   - `status`: `published` (por defecto), `draft`, `archived` o `all`
   - `page`: número de página (por defecto `1`)
-  - `per_page`: cantidad de elementos por página (por defecto `10`, máx `50`)
-- `GET /api/articles/<slug>`: Obtiene el artículo completo con sus secciones ordenadas por `position` y una lista de artículos relacionados de la misma categoría.
+  - `limit`: cantidad de elementos por página (por defecto `10`, máx `100`)
+- `GET /api/articles/<slug>`: Obtiene el artículo completo con sus secciones ordenadas por `position`. Permite `?preview=true` para borradores.
 - `POST /api/articles`: Crea un artículo nuevo con sus secciones.
 - `PUT /api/articles/<slug>`: Actualiza metadatos y/o secciones del artículo.
 - `DELETE /api/articles/<slug>`: Elimina un artículo y sus secciones en cascada.

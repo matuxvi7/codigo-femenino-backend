@@ -3,6 +3,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from src.config import Config
 from src.routes import api
+from src.routes.docs import docs_bp
 
 
 def create_app() -> Flask:
@@ -16,7 +17,10 @@ def create_app() -> Flask:
         supports_credentials=True,
     )
 
-    # Registrar rutas principales bajo /api
+    # Registrar documentación interactiva Swagger en /docs
+    app.register_blueprint(docs_bp)
+
+    # Registrar rutas principales de la API bajo /api
     app.register_blueprint(api)
 
     @app.route("/")
@@ -24,6 +28,10 @@ def create_app() -> Flask:
         return jsonify({
             "service": "Código Femenino - API Backend",
             "version": "1.0.0",
+            "documentation": {
+                "swagger_ui": "/docs",
+                "openapi_spec": "/docs/openapi.yaml"
+            },
             "endpoints": {
                 "health": "/api/health",
                 "categories": "/api/categories",
