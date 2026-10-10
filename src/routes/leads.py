@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from src.services.lead_service import LeadService
-from src.validators import validate_lead_payload
+from src.utils.hateoas import build_paginated_response
+from src.validators import parse_pagination, validate_lead_payload
 
 leads_bp = Blueprint("leads", __name__)
 
@@ -71,10 +72,26 @@ def subscribe_guia_gratuita():
 
 @leads_bp.get("/leads")
 def list_leads():
-    source = request.args.get("source")
-    leads = LeadService.list_leads(source=source)
-    return jsonify({
-        "success": True,
-        "count": len(leads),
-        "data": leads
-    })
+    page, per_page = parse_pagination(request.args)
+    source = request.args.get("source", "").strip() or None
+
+    result = LeadService.list_leads(
+        source=source,
+        page=page,
+        per_page=per_page,
+    )
+
+    extra_params = {}
+    if source:
+        extra_params["source"] = source
+
+    response = build_paginated_response(
+        data=result["items"],
+        pagination=result["pagination"],
+        endpoint=request.path,
+        extra_params=extra_params,
+    )
+    # Metadato count adicional para compatibilidad
+    response["count"] = len(result["items"])
+
+    return jsonify(response), 200

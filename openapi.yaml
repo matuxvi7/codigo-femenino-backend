@@ -172,6 +172,8 @@ paths:
                       $ref: '#/components/schemas/ArticleSummary'
                   pagination:
                     $ref: '#/components/schemas/Pagination'
+                  _links:
+                    $ref: '#/components/schemas/PaginationLinks'
 
     post:
       tags:
@@ -334,8 +336,8 @@ paths:
     get:
       tags:
         - Leads
-      summary: Listar registros de leads
-      description: Consulta los suscriptores captados, con opción de filtrar por origen.
+      summary: Listar registros de leads con paginación HATEOAS
+      description: Consulta los suscriptores captados, con opción de filtrar por origen y navegación HATEOAS.
       parameters:
         - name: source
           in: query
@@ -344,9 +346,26 @@ paths:
           schema:
             type: string
             enum: [newsletter, guia_gratuita]
+        - name: page
+          in: query
+          required: false
+          description: Número de página (base 1)
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          description: Cantidad de resultados por página (máximo 50)
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
       responses:
         "200":
-          description: Listado de leads registrados
+          description: Listado paginado de leads registrados con enlaces de navegación
           content:
             application/json:
               schema:
@@ -357,11 +376,15 @@ paths:
                     example: true
                   count:
                     type: integer
-                    example: 24
+                    example: 10
                   data:
                     type: array
                     items:
                       $ref: '#/components/schemas/Lead'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                  _links:
+                    $ref: '#/components/schemas/PaginationLinks'
 
     post:
       tags:
@@ -727,6 +750,28 @@ components:
               type: boolean
               example: true
 
+    PaginationLinks:
+      type: object
+      description: Enlaces HATEOAS de navegación de colecciones paginadas
+      properties:
+        self:
+          type: string
+          example: "/api/articles?page=1&per_page=10"
+        first:
+          type: string
+          example: "/api/articles?page=1&per_page=10"
+        prev:
+          type: string
+          nullable: true
+          example: null
+        next:
+          type: string
+          nullable: true
+          example: "/api/articles?page=2&per_page=10"
+        last:
+          type: string
+          example: "/api/articles?page=4&per_page=10"
+
     Pagination:
       type: object
       properties:
@@ -736,7 +781,7 @@ components:
         per_page:
           type: integer
           example: 10
-        total:
+        total_items:
           type: integer
           example: 35
         total_pages:
@@ -748,6 +793,8 @@ components:
         has_prev:
           type: boolean
           example: false
+        links:
+          $ref: '#/components/schemas/PaginationLinks' 
 
     ErrorResponse:
       type: object

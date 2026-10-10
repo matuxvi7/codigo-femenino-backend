@@ -30,5 +30,9 @@ class LeadService:
         }
 
     @staticmethod
-    def list_leads(source: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
-        return LeadRepository.list_all(source=source, limit=limit)
+    def list_leads(
+        source: Optional[str] = None,
+        page: int = 1,
+        per_page: int = 10,
+    ) -> Dict[str, Any]:
+        return LeadRepository.get_paginated(source=source, page=page, per_page=per_page)

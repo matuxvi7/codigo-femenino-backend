@@ -27,6 +27,8 @@ codigo-femenino-backend/
     │   ├── category_service.py
     │   ├── article_service.py
     │   └── lead_service.py
+    ├── utils/                  # Utilidades compartidas y HATEOAS
+    │   └── hateoas.py          # Generador de enlaces hypermedia de navegación
     ├── validators/             # Validación y sanitización de datos de entrada
     │   ├── common.py
     │   ├── article_validators.py
@@ -108,6 +110,51 @@ El servidor quedará disponible en `http://localhost:5000` y la documentación e
 
 ---
 
+---
+
+## 🔗 Paginación HATEOAS
+
+Los endpoints de colecciones (`GET /api/articles` y `GET /api/leads`) implementan el principio **HATEOAS** (*Hypermedia as the Engine of Application State*). Cada respuesta paginada incluye enlaces de navegación calculados dinámicamente preservando los filtros aplicados:
+
+- `self`: URL de la página actual solicitada.
+- `first`: Enlace a la primera página (`page=1`).
+- `prev`: Enlace a la página anterior (`null` si se encuentra en la primera página).
+- `next`: Enlace a la página siguiente (`null` si se encuentra en la última página).
+- `last`: Enlace a la última página disponible.
+
+Ejemplo de estructura de respuesta:
+
+```json
+{
+  "success": true,
+  "data": [ ... ],
+  "pagination": {
+    "page": 2,
+    "per_page": 10,
+    "total_items": 35,
+    "total_pages": 4,
+    "has_next": true,
+    "has_prev": true,
+    "links": {
+      "self": "/api/articles?category=finanzas&page=2&per_page=10",
+      "first": "/api/articles?category=finanzas&page=1&per_page=10",
+      "prev": "/api/articles?category=finanzas&page=1&per_page=10",
+      "next": "/api/articles?category=finanzas&page=3&per_page=10",
+      "last": "/api/articles?category=finanzas&page=4&per_page=10"
+    }
+  },
+  "_links": {
+    "self": "/api/articles?category=finanzas&page=2&per_page=10",
+    "first": "/api/articles?category=finanzas&page=1&per_page=10",
+    "prev": "/api/articles?category=finanzas&page=1&per_page=10",
+    "next": "/api/articles?category=finanzas&page=3&per_page=10",
+    "last": "/api/articles?category=finanzas&page=4&per_page=10"
+  }
+}
+```
+
+---
+
 ## 📡 Referencia de Endpoints de la API
 
 Todos los endpoints están prefijados con `/api` (a excepción de la documentación en `/docs`).
@@ -120,12 +167,12 @@ Todos los endpoints están prefijados con `/api` (a excepción de la documentaci
 - `GET /api/categories/<slug>`: Detalle de una categoría específica (`relaciones`, `autoestima`, `psicologia`, `belleza`).
 
 ### 3. Artículos
-- `GET /api/articles`: Lista artículos paginados. Parámetros opcionales (query string):
+- `GET /api/articles`: Lista artículos con filtros y paginación HATEOAS. Parámetros opcionales (query string):
   - `category`: slug de la categoría (ej. `?category=relaciones`)
   - `search`: búsqueda de texto en título o resumen (ej. `?search=limites`)
   - `status`: `published` (por defecto), `draft`, `archived` o `all`
   - `page`: número de página (por defecto `1`)
-  - `limit`: cantidad de elementos por página (por defecto `10`, máx `100`)
+  - `per_page` o `limit`: cantidad de elementos por página (por defecto `10`, máx `50`)
 - `GET /api/articles/<slug>`: Obtiene el artículo completo con sus secciones ordenadas por `position`. Permite `?preview=true` para borradores.
 - `POST /api/articles`: Crea un artículo nuevo con sus secciones.
 - `PUT /api/articles/<slug>`: Actualiza metadatos y/o secciones del artículo.
@@ -154,7 +201,10 @@ Todos los endpoints están prefijados con `/api` (a excepción de la documentaci
     "full_name": "Sofía García"
   }
   ```
-- `GET /api/leads`: Consulta el listado de leads registrados (parámetro opcional `?source=newsletter` o `?source=guia_gratuita`).
+- `GET /api/leads`: Consulta el listado de leads con paginación HATEOAS. Parámetros opcionales:
+  - `source`: filtrar por canal (`newsletter` o `guia_gratuita`)
+  - `page`: número de página (por defecto `1`)
+  - `per_page` o `limit`: cantidad de registros por página (por defecto `10`, máx `50`)
 
 ---
 

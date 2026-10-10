@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from src.services.article_service import ArticleService
+from src.utils.hateoas import build_paginated_response
 from src.validators import (
     parse_pagination,
     validate_article_payload,
@@ -14,23 +15,35 @@ def list_articles():
     page, per_page = parse_pagination(request.args)
     category_slug = request.args.get("category", "").strip().lower() or None
     search = request.args.get("search", "").strip() or None
-    status = request.args.get("status", "published").strip().lower()
-    if status == "all":
-        status = None
+    raw_status = request.args.get("status")
+    if raw_status is not None:
+        clean_status = raw_status.strip().lower()
+        status_filter = None if clean_status == "all" else clean_status
+    else:
+        status_filter = "published"
 
     result = ArticleService.list_articles(
         category_slug=category_slug,
         search=search,
-        status=status,
+        status=status_filter,
         page=page,
         per_page=per_page,
     )
 
-    return jsonify({
-        "success": True,
-        "data": result["items"],
-        "pagination": result["pagination"]
-    })
+    extra_params = {}
+    if category_slug:
+        extra_params["category"] = category_slug
+    if search:
+        extra_params["search"] = search
+    if raw_status is not None and raw_status.strip():
+        extra_params["status"] = raw_status.strip()
+
+    return jsonify(build_paginated_response(
+        data=result["items"],
+        pagination=result["pagination"],
+        endpoint=request.path,
+        extra_params=extra_params,
+    ))
 
 
 @articles_bp.get("/<slug>")
