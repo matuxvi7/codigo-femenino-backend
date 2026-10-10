@@ -1,7 +1,9 @@
 import os
 from flask import Flask, jsonify
 from flask_cors import CORS
+from werkzeug.serving import is_running_from_reloader
 from src.config import Config
+from src.dev_database import reset_development_database
 from src.routes import api
 from src.routes.docs import docs_bp
 
@@ -46,5 +48,7 @@ def create_app() -> Flask:
 
 
 if __name__ == "__main__":
+    if not Config.DEBUG or is_running_from_reloader():
+        reset_development_database()
     app = create_app()
     app.run(host="0.0.0.0", port=Config.PORT, debug=Config.DEBUG)

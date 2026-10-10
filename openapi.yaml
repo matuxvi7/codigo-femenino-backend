@@ -571,6 +571,15 @@ components:
         author:
           type: string
           example: "Redacción Código Femenino"
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+          example: "https://res.cloudinary.com/ejemplo/image/upload/articulo.jpg"
+        image_public_id:
+          type: string
+          nullable: true
+          example: "codigo-femenino/articles/ldh50yehwczwvxcsw872"
         read_time_minutes:
           type: integer
           example: 6
@@ -629,6 +638,19 @@ components:
           maxLength: 160
           default: "Redacción Código Femenino"
           example: "Mariana Costa"
+        image_url:
+          type: string
+          format: uri
+          maxLength: 500
+          nullable: true
+          description: URL de la imagen ya subida. Envía null si el artículo no tiene imagen.
+          example: "https://res.cloudinary.com/gvamujrm/image/upload/v1791619066/codigo-femenino/articles/ldh50yehwczwvxcsw872.jpg"
+        image_public_id:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: Identificador de Cloudinary correspondiente a image_url.
+          example: "codigo-femenino/articles/ldh50yehwczwvxcsw872"
         read_time_minutes:
           type: integer
           minimum: 1
@@ -665,6 +687,17 @@ components:
         author:
           type: string
           maxLength: 160
+        image_url:
+          type: string
+          format: uri
+          maxLength: 500
+          nullable: true
+          description: Si se omite se conserva la imagen actual; null la quita.
+        image_public_id:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: Si se omite se conserva el identificador actual; null lo quita.
         read_time_minutes:
           type: integer
           minimum: 1

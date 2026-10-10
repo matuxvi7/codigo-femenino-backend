@@ -1,7 +1,7 @@
 -- Requiere MySQL 8.0 o posterior.
 CREATE DATABASE IF NOT EXISTS codigo_femenino
   CHARACTER SET utf8mb4
-  COLLATE utf8mb4_0900_ai_ci;
+  COLLATE utf8mb4_unicode_ci;
 
 USE codigo_femenino;
 
@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS articles (
   published_at DATE NOT NULL,
   read_time_minutes TINYINT UNSIGNED NOT NULL,
   status ENUM('draft', 'published', 'archived') NOT NULL DEFAULT 'draft',
+  image_url VARCHAR(500) NULL,
+  image_public_id VARCHAR(255) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

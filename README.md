@@ -96,6 +96,23 @@ DB_PASSWORD=tu_password
 DB_NAME=codigo_femenino
 ```
 
+### Reinicio automático de la base de datos (solo desarrollo)
+
+Por defecto, el backend **no borra ni reinicia la base** al arrancar. Si necesitas
+recrear el esquema y cargar los datos de ejemplo en cada inicio local, configura
+estas variables en `.env`:
+
+```ini
+APP_ENV=development
+RESET_DEV_DATABASE_ON_STARTUP=true
+```
+
+Esta opción elimina por completo la base indicada por `DB_NAME` y la reconstruye
+ejecutando `scripts/init_db.sql`. Se ejecuta una sola vez cuando inicia el proceso
+del servidor (no en el proceso padre del recargador de Flask). **Todos los datos
+de esa base se pierden en cada inicio o recarga de desarrollo.** No la habilites
+en producción; el backend se negará a ejecutarla si `APP_ENV` no es `development`.
+
 ### 4. Inicializar la base de datos
 Ejecuta el script SQL incluido para crear las tablas (`categories`, `articles`, `article_sections`, `lead_signups`) e insertar los artículos de demostración:
 ```bash

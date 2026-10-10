@@ -11,6 +11,8 @@ ARTICLE_FIELDS = (
     "read_time_minutes",
     "status",
     "published_at",
+    "image_url",
+    "image_public_id",
 )
 
 
@@ -56,6 +58,8 @@ class ArticleRepository:
                 a.title,
                 a.excerpt,
                 a.author,
+                a.image_url,
+                a.image_public_id,
                 a.published_at,
                 a.read_time_minutes,
                 a.status,
@@ -88,6 +92,8 @@ class ArticleRepository:
                 "title": row["title"],
                 "excerpt": row["excerpt"],
                 "author": row["author"],
+                "image_url": row["image_url"],
+                "image_public_id": row["image_public_id"],
                 "published_at": str(row["published_at"]) if row["published_at"] else None,
                 "read_time_minutes": row["read_time_minutes"],
                 "status": row["status"],
@@ -127,6 +133,8 @@ class ArticleRepository:
                 a.title,
                 a.excerpt,
                 a.author,
+                a.image_url,
+                a.image_public_id,
                 a.published_at,
                 a.read_time_minutes,
                 a.status,
@@ -152,6 +160,8 @@ class ArticleRepository:
                 "title": row["title"],
                 "excerpt": row["excerpt"],
                 "author": row["author"],
+                "image_url": row["image_url"],
+                "image_public_id": row["image_public_id"],
                 "published_at": str(row["published_at"]) if row["published_at"] else None,
                 "read_time_minutes": row["read_time_minutes"],
                 "status": row["status"],
@@ -186,6 +196,8 @@ class ArticleRepository:
                 a.title,
                 a.excerpt,
                 a.author,
+                a.image_url,
+                a.image_public_id,
                 a.published_at,
                 a.read_time_minutes,
                 c.slug AS category_slug,
@@ -207,6 +219,8 @@ class ArticleRepository:
                     "title": row["title"],
                     "excerpt": row["excerpt"],
                     "author": row["author"],
+                    "image_url": row["image_url"],
+                    "image_public_id": row["image_public_id"],
                     "published_at": str(row["published_at"]) if row["published_at"] else None,
                     "read_time_minutes": row["read_time_minutes"],
                     "category": {
@@ -221,10 +235,12 @@ class ArticleRepository:
     def create(data: Dict[str, Any]) -> int:
         sql = """
             INSERT INTO articles (
-                category_id, slug, title, excerpt, author, published_at, read_time_minutes, status
+                category_id, slug, title, excerpt, author, published_at, read_time_minutes, status,
+                image_url, image_public_id
             ) VALUES (
                 %(category_id)s, %(slug)s, %(title)s, %(excerpt)s, %(author)s,
-                COALESCE(%(published_at)s, CURRENT_DATE), %(read_time_minutes)s, %(status)s
+                COALESCE(%(published_at)s, CURRENT_DATE), %(read_time_minutes)s, %(status)s,
+                %(image_url)s, %(image_public_id)s
             )
         """
         with get_db_cursor() as cursor:
@@ -247,7 +263,17 @@ class ArticleRepository:
     def update(slug: str, data: Dict[str, Any]) -> bool:
         fields = []
         params = {}
-        for key in ("title", "excerpt", "author", "published_at", "read_time_minutes", "status", "category_id"):
+        for key in (
+            "title",
+            "excerpt",
+            "author",
+            "published_at",
+            "read_time_minutes",
+            "status",
+            "category_id",
+            "image_url",
+            "image_public_id",
+        ):
             if key in data:
                 fields.append(f"{key} = %({key})s")
                 params[key] = data[key]

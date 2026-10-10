@@ -8,6 +8,10 @@ load_dotenv()
 class Config:
     PORT = int(os.getenv("PORT", "5000"))
     DEBUG = os.getenv("FLASK_DEBUG", "True").lower() in ("true", "1", "t")
+    APP_ENV = os.getenv("APP_ENV", "production").strip().lower()
+    RESET_DEV_DATABASE_ON_STARTUP = os.getenv(
+        "RESET_DEV_DATABASE_ON_STARTUP", "false"
+    ).strip().lower() in ("true", "1", "yes", "on")
     CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 
     # Base de datos MySQL

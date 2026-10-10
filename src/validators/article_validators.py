@@ -77,6 +77,26 @@ def validate_article_payload(data: Any, is_update: bool = False) -> Tuple[bool, 
     if "published_at" in data:
         clean_data["published_at"] = data.get("published_at")
 
+    for field, max_length in (("image_url", 500), ("image_public_id", 255)):
+        if field in data:
+            value = data[field]
+            if value is not None and not isinstance(value, str):
+                errors.append(f"El campo '{field}' debe ser texto o null.")
+            elif isinstance(value, str):
+                value = value.strip()
+                if not value:
+                    errors.append(f"El campo '{field}' no puede estar vacío; usa null para quitarlo.")
+                elif len(value) > max_length:
+                    errors.append(
+                        f"El campo '{field}' no puede superar los {max_length} caracteres."
+                    )
+                else:
+                    clean_data[field] = value
+            else:
+                clean_data[field] = None
+        elif not is_update:
+            clean_data[field] = None
+
     if "sections" in data:
         sections = data.get("sections")
         if not isinstance(sections, list):
