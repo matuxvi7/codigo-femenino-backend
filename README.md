@@ -96,6 +96,24 @@ DB_PASSWORD=tu_password
 DB_NAME=codigo_femenino
 ```
 
+#### MySQL administrado en Aiven (TLS)
+
+PyMySQL cifra la conexión y verifica el certificado y el hostname cuando se configura
+el certificado CA de Aiven. Descarga el CA desde la consola de Aiven, guárdalo como
+`certs/aiven-ca.pem` en el proyecto (ese archivo está excluido de Git) y configura
+en `.env` la ruta absoluta al archivo:
+
+```ini
+DB_SSL_REQUIRED=true
+DB_SSL_CA=C:/ruta/al/proyecto/certs/aiven-ca.pem
+```
+
+En Linux/macOS usa la ruta absoluta correspondiente, por ejemplo
+`/ruta/al/proyecto/certs/aiven-ca.pem`. Si `DB_SSL_REQUIRED=true` pero falta
+`DB_SSL_CA`, el backend falla explícitamente al cargar la configuración en lugar
+de conectarse sin TLS. Para una base MySQL local, se pueden dejar ambas variables
+sin configurar.
+
 ### Reinicio automático de la base de datos (solo desarrollo)
 
 Por defecto, el backend **no borra ni reinicia la base** al arrancar. Si necesitas

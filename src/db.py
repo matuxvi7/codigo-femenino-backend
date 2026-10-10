@@ -28,6 +28,7 @@ def get_pool() -> PooledDB:
                 charset="utf8mb4",
                 cursorclass=DictCursor,
                 autocommit=False,
+                **Config.DB_SSL_OPTIONS,
             )
         except Exception as e:
             logger.error("Error al inicializar pool de conexiones MySQL: %s", e)

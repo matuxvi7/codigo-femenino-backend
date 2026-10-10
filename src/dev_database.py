@@ -30,6 +30,7 @@ def reset_development_database() -> None:
         charset="utf8mb4",
         autocommit=True,
         client_flag=CLIENT.MULTI_STATEMENTS,
+        **Config.DB_SSL_OPTIONS,
     )
     try:
         with connection.cursor() as cursor:
