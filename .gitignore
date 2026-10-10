@@ -7,9 +7,15 @@ env/
 venv/
 .venv/
 .env
-/certs/aiven-ca.pem
+.env.*
+!.env.example
+/certs/
 .idea/
 .vscode/
 *.swp
 *.swo
 *.pem
+*.key
+*.crt
+*.p12
+*.pfx

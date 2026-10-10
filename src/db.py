@@ -30,9 +30,12 @@ def get_pool() -> PooledDB:
                 autocommit=False,
                 **Config.DB_SSL_OPTIONS,
             )
-        except Exception as e:
-            logger.error("Error al inicializar pool de conexiones MySQL: %s", e)
-            raise e
+        except Exception as exc:
+            logger.error(
+                "No se pudo inicializar el pool MySQL (%s).",
+                type(exc).__name__,
+            )
+            raise
     return _pool
 
 
@@ -44,16 +47,21 @@ def get_db_cursor() -> Generator[DictCursor, None, None]:
     """
     pool = get_pool()
     conn = pool.connection()
-    cursor = conn.cursor()
     try:
-        yield cursor
-        conn.commit()
-    except Exception as exc:
-        conn.rollback()
-        logger.error("Error en operación de base de datos: %s", exc)
-        raise exc
+        cursor = conn.cursor()
+        try:
+            yield cursor
+            conn.commit()
+        except Exception as exc:
+            conn.rollback()
+            logger.error(
+                "Falló una operación de base de datos (%s).",
+                type(exc).__name__,
+            )
+            raise
+        finally:
+            cursor.close()
     finally:
-        cursor.close()
         conn.close()
 
 
@@ -65,6 +73,13 @@ def check_db_connection() -> Dict[str, Any]:
             res = cursor.fetchone()
             if res and res.get("ping") == 1:
                 return {"status": "connected", "database": Config.DB_NAME}
-    except Exception as e:
-        return {"status": "disconnected", "error": str(e)}
+    except Exception as exc:
+        logger.warning(
+            "La comprobación de salud no pudo conectarse a MySQL (%s).",
+            type(exc).__name__,
+        )
+        return {
+            "status": "disconnected",
+            "error": "No se pudo establecer conexión con la base de datos.",
+        }
     return {"status": "unknown"}

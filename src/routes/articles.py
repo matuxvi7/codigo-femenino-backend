@@ -1,4 +1,5 @@
 from flask import Blueprint, jsonify, request
+from flask_jwt_extended import jwt_required, verify_jwt_in_request
 from src.services.article_service import ArticleService
 from src.utils.hateoas import build_paginated_response
 from src.validators import (
@@ -21,6 +22,9 @@ def list_articles():
         status_filter = None if clean_status == "all" else clean_status
     else:
         status_filter = "published"
+
+    if status_filter != "published":
+        verify_jwt_in_request()
 
     result = ArticleService.list_articles(
         category_slug=category_slug,
@@ -50,6 +54,8 @@ def list_articles():
 def get_article(slug: str):
     clean_slug = slug.strip().lower()
     include_all_statuses = request.args.get("preview", "false").lower() in ("true", "1")
+    if include_all_statuses:
+        verify_jwt_in_request()
     status = None if include_all_statuses else "published"
 
     article = ArticleService.get_article_detail(clean_slug, status=status)
@@ -67,6 +73,7 @@ def get_article(slug: str):
 
 
 @articles_bp.post("")
+@jwt_required()
 def create_article():
     payload = request.get_json(silent=True)
     is_valid, errors, clean_data = validate_article_payload(payload, is_update=False)
@@ -87,6 +94,7 @@ def create_article():
 
 
 @articles_bp.put("/<slug>")
+@jwt_required()
 def update_article(slug: str):
     clean_slug = slug.strip().lower()
     payload = request.get_json(silent=True)
@@ -115,6 +123,7 @@ def update_article(slug: str):
 
 
 @articles_bp.delete("/<slug>")
+@jwt_required()
 def delete_article(slug: str):
     clean_slug = slug.strip().lower()
     deleted = ArticleService.delete_article(clean_slug)

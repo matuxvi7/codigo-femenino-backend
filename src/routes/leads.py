@@ -1,4 +1,6 @@
 from flask import Blueprint, jsonify, request
+from flask_jwt_extended import jwt_required
+from src.extensions import limiter
 from src.services.lead_service import LeadService
 from src.utils.hateoas import build_paginated_response
 from src.validators import parse_pagination, validate_lead_payload
@@ -7,6 +9,7 @@ leads_bp = Blueprint("leads", __name__)
 
 
 @leads_bp.post("/leads")
+@limiter.shared_limit("10 per minute; 30 per hour", scope="public-lead-forms")
 def create_lead():
     payload = request.get_json(silent=True)
     is_valid, errors, clean_data = validate_lead_payload(payload)
@@ -27,6 +30,7 @@ def create_lead():
 
 
 @leads_bp.post("/newsletter")
+@limiter.shared_limit("10 per minute; 30 per hour", scope="public-lead-forms")
 def subscribe_newsletter():
     """Endpoint directo para suscripción al newsletter general."""
     payload = request.get_json(silent=True) or {}
@@ -49,6 +53,7 @@ def subscribe_newsletter():
 
 
 @leads_bp.post("/guia-gratuita")
+@limiter.shared_limit("10 per minute; 30 per hour", scope="public-lead-forms")
 def subscribe_guia_gratuita():
     """Endpoint directo para descarga de guía gratuita / ebook inicial."""
     payload = request.get_json(silent=True) or {}
@@ -71,6 +76,7 @@ def subscribe_guia_gratuita():
 
 
 @leads_bp.get("/leads")
+@jwt_required()
 def list_leads():
     page, per_page = parse_pagination(request.args)
     source = request.args.get("source", "").strip() or None

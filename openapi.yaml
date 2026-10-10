@@ -29,7 +29,56 @@ tags:
   - name: Leads
     description: Captación de suscriptores, suscripción al newsletter y entrega de guía gratuita
 
+security:
+  - {}
+
 paths:
+  /api/admin/auth/login:
+    post:
+      tags:
+        - Admin Auth
+      summary: Iniciar sesión como administradora
+      description: Intercambia credenciales administrativas por un JWT Bearer de corta duración.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Token de acceso administrativo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, access_token, token_type, expires_in]
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                    example: Bearer
+                  expires_in:
+                    type: integer
+                    example: 900
+        "401":
+          description: Credenciales incorrectas
+        "429":
+          description: Se excedió el límite de intentos de inicio de sesión por IP
+        "503":
+          description: Acceso administrativo no configurado
+
   /api/health:
     get:
       tags:
@@ -114,7 +163,7 @@ paths:
       tags:
         - Articles
       summary: Listar artículos con filtros y paginación
-      description: Retorna un listado paginado de artículos. Por defecto devuelve solo los artículos publicados.
+      description: Retorna un listado paginado de artículos publicados. Para filtrar otros estados se requiere autenticación Bearer.
       parameters:
         - name: category
           in: query
@@ -133,7 +182,7 @@ paths:
         - name: status
           in: query
           required: false
-          description: Estado del artículo ('published', 'draft', 'archived' o 'all')
+          description: Para draft, archived o all se requiere un JWT Bearer administrativo.
           schema:
             type: string
             enum: [published, draft, archived, all]
@@ -155,6 +204,9 @@ paths:
             default: 10
             minimum: 1
             maximum: 100
+      security:
+        - {}
+        - BearerAuth: []
       responses:
         "200":
           description: Listado paginado de artículos
@@ -174,12 +226,16 @@ paths:
                     $ref: '#/components/schemas/Pagination'
                   _links:
                     $ref: '#/components/schemas/PaginationLinks'
+        "401":
+          description: Se requiere autenticación para consultar estados no publicados
 
     post:
       tags:
         - Articles
       summary: Crear un nuevo artículo con secciones
       description: Registra un artículo en estado borrador o publicado, incluyendo opcionalmente sus secciones de contenido estructurado.
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -208,13 +264,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
+        "401":
+          description: Se requiere un JWT Bearer administrativo
 
   /api/articles/{slug}:
     get:
       tags:
         - Articles
       summary: Obtener el detalle completo de un artículo
-      description: Retorna toda la información del artículo y sus secciones de contenido ordenadas por posición.
+      description: Devuelve el artículo publicado. El parámetro preview=true requiere JWT Bearer administrativo.
+      security:
+        - {}
+        - BearerAuth: []
       parameters:
         - name: slug
           in: path
@@ -249,12 +310,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        "401":
+          description: Se requiere autenticación para consultar un borrador
 
     put:
       tags:
         - Articles
       summary: Actualizar un artículo existente
       description: Modifica los campos principales de un artículo o sus secciones.
+      security:
+        - BearerAuth: []
       parameters:
         - name: slug
           in: path
@@ -297,12 +362,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        "401":
+          description: Se requiere un JWT Bearer administrativo
 
     delete:
       tags:
         - Articles
       summary: Eliminar un artículo
       description: Elimina el artículo y sus secciones asociadas de la base de datos.
+      security:
+        - BearerAuth: []
       parameters:
         - name: slug
           in: path
@@ -331,6 +400,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+        "401":
+          description: Se requiere un JWT Bearer administrativo
 
   /api/leads:
     get:
@@ -338,6 +409,8 @@ paths:
         - Leads
       summary: Listar registros de leads con paginación HATEOAS
       description: Consulta los suscriptores captados, con opción de filtrar por origen y navegación HATEOAS.
+      security:
+        - BearerAuth: []
       parameters:
         - name: source
           in: query
@@ -385,6 +458,8 @@ paths:
                     $ref: '#/components/schemas/Pagination'
                   _links:
                     $ref: '#/components/schemas/PaginationLinks'
+        "401":
+          description: Se requiere un JWT Bearer administrativo
 
     post:
       tags:
@@ -410,6 +485,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
+        "429":
+          description: Se excedió el límite compartido de solicitudes de formularios por IP
 
   /api/newsletter:
     post:
@@ -446,6 +523,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
+        "429":
+          description: Se excedió el límite compartido de solicitudes de formularios por IP
 
   /api/guia-gratuita:
     post:
@@ -482,8 +561,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
+        "429":
+          description: Se excedió el límite compartido de solicitudes de formularios por IP
 
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     HealthResponse:
       type: object
@@ -500,9 +586,12 @@ components:
             status:
               type: string
               example: connected
-            message:
+            database:
               type: string
-              example: Conexión a MySQL exitosa
+              example: codigo_femenino
+            error:
+              type: string
+              example: No se pudo establecer conexión con la base de datos.
 
     Category:
       type: object

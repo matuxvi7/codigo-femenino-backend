@@ -1,18 +1,55 @@
-import os
 from flask import Flask, jsonify
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.serving import is_running_from_reloader
 from src.config import Config
 from src.dev_database import reset_development_database
+from src.extensions import limiter
 from src.routes import api
 from src.routes.docs import docs_bp
 
 
 def create_app() -> Flask:
+    Config.validate()
     app = Flask(__name__)
     app.config.from_object(Config)
+    app.config["RATELIMIT_STORAGE_URI"] = Config.RATE_LIMIT_STORAGE_URI
+    app.config["RATELIMIT_STRATEGY"] = "fixed-window"
+    app.config["RATELIMIT_HEADERS_ENABLED"] = True
+    app.config["RATELIMIT_IN_MEMORY_FALLBACK_ENABLED"] = False
+    limiter.init_app(app)
+    if Config.APP_ENV == "production":
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
+    app.config["JWT_SECRET_KEY"] = Config.JWT_SECRET_KEY
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = Config.JWT_ACCESS_TOKEN_EXPIRES
+    app.config["JWT_TOKEN_LOCATION"] = ["headers"]
+    jwt = JWTManager(app)
 
-    # Configuración de CORS para permitir consumo desde el frontend
+    @jwt.unauthorized_loader
+    def missing_token(_reason: str):
+        return jsonify({
+            "success": False,
+            "error": "AUTHENTICATION_REQUIRED",
+            "message": "Se requiere un token de acceso válido.",
+        }), 401
+
+    @jwt.invalid_token_loader
+    def invalid_token(_reason: str):
+        return jsonify({
+            "success": False,
+            "error": "INVALID_TOKEN",
+            "message": "El token de acceso no es válido.",
+        }), 401
+
+    @jwt.expired_token_loader
+    def expired_token(_jwt_header: dict, _jwt_payload: dict):
+        return jsonify({
+            "success": False,
+            "error": "TOKEN_EXPIRED",
+            "message": "El token de acceso expiró. Inicia sesión nuevamente.",
+        }), 401
+
     CORS(
         app,
         resources={r"/*": {"origins": Config.CORS_ORIGINS}},
@@ -48,7 +85,9 @@ def create_app() -> Flask:
 
 
 if __name__ == "__main__":
-    if not Config.DEBUG or is_running_from_reloader():
+    if Config.APP_ENV == "development" and (
+        not Config.DEBUG or is_running_from_reloader()
+    ):
         reset_development_database()
     app = create_app()
     app.run(host="0.0.0.0", port=Config.PORT, debug=Config.DEBUG)

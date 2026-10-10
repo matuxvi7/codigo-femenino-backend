@@ -87,6 +87,8 @@ Ejemplo de configuración:
 ```ini
 PORT=5000
 FLASK_DEBUG=True
+APP_ENV=development
+RESET_DEV_DATABASE_ON_STARTUP=false
 CORS_ORIGINS=*
 
 DB_HOST=127.0.0.1
@@ -99,20 +101,18 @@ DB_NAME=codigo_femenino
 #### MySQL administrado en Aiven (TLS)
 
 PyMySQL cifra la conexión y verifica el certificado y el hostname cuando se configura
-el certificado CA de Aiven. Descarga el CA desde la consola de Aiven, guárdalo como
-`certs/aiven-ca.pem` en el proyecto (ese archivo está excluido de Git) y configura
+el certificado CA de Aiven. Descarga el CA desde la consola de Aiven, guárdalo dentro
+de `certs/` para desarrollo local (esa carpeta está excluida de Git) y configura
 en `.env` la ruta absoluta al archivo:
 
 ```ini
 DB_SSL_REQUIRED=true
-DB_SSL_CA=C:/ruta/al/proyecto/certs/aiven-ca.pem
+DB_SSL_CA=C:/ruta/al/proyecto/certs/ca_aiven.pem
 ```
 
-En Linux/macOS usa la ruta absoluta correspondiente, por ejemplo
-`/ruta/al/proyecto/certs/aiven-ca.pem`. Si `DB_SSL_REQUIRED=true` pero falta
-`DB_SSL_CA`, el backend falla explícitamente al cargar la configuración en lugar
-de conectarse sin TLS. Para una base MySQL local, se pueden dejar ambas variables
-sin configurar.
+En producción, TLS con CA es obligatorio. Si falta la configuración o el archivo,
+la aplicación falla al arrancar con un mensaje que no expone credenciales. Para una
+base MySQL local, se pueden dejar ambas variables sin configurar.
 
 ### Reinicio automático de la base de datos (solo desarrollo)
 
@@ -126,10 +126,10 @@ RESET_DEV_DATABASE_ON_STARTUP=true
 ```
 
 Esta opción elimina por completo la base indicada por `DB_NAME` y la reconstruye
-ejecutando `scripts/init_db.sql`. Se ejecuta una sola vez cuando inicia el proceso
-del servidor (no en el proceso padre del recargador de Flask). **Todos los datos
-de esa base se pierden en cada inicio o recarga de desarrollo.** No la habilites
-en producción; el backend se negará a ejecutarla si `APP_ENV` no es `development`.
+ejecutando `scripts/init_db.sql`. Solo se permite con `APP_ENV=development` y solo
+se ejecuta al iniciar `python app.py`, no al importar la aplicación con Gunicorn.
+**Todos los datos de esa base se pierden en cada inicio o recarga de desarrollo.**
+La configuración de producción rechaza esta opción.
 
 ### 4. Inicializar la base de datos
 Ejecuta el script SQL incluido para crear las tablas (`categories`, `articles`, `article_sections`, `lead_signups`) e insertar los artículos de demostración:
@@ -144,6 +144,102 @@ python app.py
 El servidor quedará disponible en `http://localhost:5000` y la documentación en `http://localhost:5000/docs`.
 
 ---
+
+## 🚀 Despliegue en Render
+
+El repositorio incluye `render.yaml` como plantilla del servicio web. Al crear el
+servicio desde el Blueprint, completá las variables marcadas como manuales en
+Render. El comando de inicio configurado es:
+
+```bash
+gunicorn --workers 2 --threads 4 --bind 0.0.0.0:$PORT "app:create_app()"
+```
+
+Usa la factory Flask `create_app()`. En producción `APP_ENV=production` fuerza
+debug desactivado, exige TLS verificado hacia MySQL y rechaza la inicialización
+destructiva de la base. No se ejecutan `scripts/init_db.sql` ni otros scripts
+automáticamente. Inicializá o migrá el esquema de Aiven por un procedimiento
+manual controlado; no uses el reinicio de desarrollo contra datos reales.
+
+### Acceso del panel administrativo
+
+El backend entrega JWT Bearer de corta duración (15 minutos) a través de
+`POST /api/admin/auth/login`, usando `ADMIN_USERNAME` y `ADMIN_PASSWORD`.
+Todas las solicitudes protegidas deben incluir
+`Authorization: Bearer <access_token>`. Configurá también `JWT_SECRET_KEY` con
+un valor aleatorio único de al menos 32 bytes y una contraseña de administración
+de al menos 12 caracteres; podés generar el secreto con:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Guardá estas variables como secretos del servicio Render, no en el frontend ni
+en Git. El frontend solicita el token al backend y lo envía en las peticiones
+administrativas. No compartas el token ni lo incluyas en URLs. El endpoint de login es público por necesidad; no devuelve token si las
+credenciales son incorrectas, vacías, de ejemplo o no están configuradas.
+Al rotar `JWT_SECRET_KEY`, todos los tokens vigentes quedan invalidados. Los JWT
+son stateless y no tienen revocación individual antes de su vencimiento.
+
+Rutas públicas de lectura: health, categorías, artículos publicados y
+documentación. Los formularios de suscripción también siguen públicos.
+Requieren autenticación: listado de leads, creación/actualización/eliminación de
+artículos y lectura de drafts/archived mediante `status` o `preview=true`.
+Actualmente no existen rutas HTTP para modificar categorías ni subir/eliminar
+imágenes; si se agregan, deben protegerse con el mismo JWT.
+
+La API pública de suscripción no requiere login. El login está limitado a 5
+intentos por minuto por IP; los tres formularios comparten un cupo de 10
+solicitudes por minuto y 30 por hora por IP. En producción estos contadores se
+almacenan en Redis para que sean compartidos por todos los workers e instancias.
+Render debe tener conectividad privada con el servicio Redis. La aplicación
+confía en una cabecera de IP reenviada por el proxy de Render; no expongas Gunicorn
+saltándote ese proxy.
+
+### Variables requeridas en Render
+
+- `APP_ENV=production`, `FLASK_DEBUG=false`,
+  `RESET_DEV_DATABASE_ON_STARTUP=false`.
+- `ADMIN_USERNAME`, `ADMIN_PASSWORD` y `JWT_SECRET_KEY` para emitir tokens del
+  panel; usá contraseñas fuertes y un secreto JWT aleatorio de al menos 32 bytes.
+- `REDIS_URL`: URI privada de un servicio Redis compatible, preferentemente
+  `rediss://` con TLS. Es obligatoria en producción; por ejemplo, usá un servicio
+  Redis administrado accesible desde Render (Render Key Value o un proveedor
+  compatible). No uses `memory://`: solo se usa para desarrollo local y no
+  comparte los límites entre procesos.
+- `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`: datos de conexión
+  de Aiven. Guardá credenciales únicamente como variables privadas del servicio.
+- `DB_SSL_REQUIRED=true` y `DB_SSL_CA=/etc/secrets/aiven-ca.pem`.
+- `CORS_ORIGINS`: uno o varios orígenes HTTPS exactos separados por comas, por
+  ejemplo `https://codigo-femenino.vercel.app`. Agregá cada dominio de preview
+  expresamente si debe acceder a la API. No se aceptan comodines en producción.
+- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`,
+  `CLOUDINARY_API_SECRET`: opcionales para las operaciones que usan el servicio
+  de carga de imágenes. Si se configura una, deben configurarse las tres.
+
+En **Render → servicio → Environment → Secret Files**, cargá el certificado CA
+descargado desde Aiven con el nombre `aiven-ca.pem`. Render lo monta como
+`/etc/secrets/aiven-ca.pem`; el archivo no debe subirse a Git. `render.yaml`
+configura `DB_SSL_CA` con esa ruta. En local, usá la ruta absoluta al certificado
+guardado en la carpeta ignorada `certs/`.
+
+El health check de Render usa `GET /api/health` y responde `503` si MySQL no está
+disponible; comprobá que el firewall/lista de IPs de Aiven permita conexiones
+desde Render y que el servicio Aiven esté activo. Luego verificá:
+
+1. `GET /` devuelve el índice informativo de la API.
+2. `GET /api/health` devuelve `200` con estado de base `connected`.
+3. `GET /api/categories` y `GET /api/articles` devuelven `200`.
+4. `GET /docs` y `GET /docs/openapi.yaml` sirven Swagger y su especificación.
+5. `POST /api/admin/auth/login` entrega un token solo con credenciales válidas;
+   sin Bearer, `GET /api/leads`, las escrituras de artículos y los previews
+   responden `401`.
+
+La API acepta `image_url`/`image_public_id` en los artículos. Aunque existe un
+servicio interno de Cloudinary, actualmente no hay una ruta HTTP de carga de
+archivos que lo invoque; para carga desde el panel deberá definirse e integrarse
+ese flujo aparte. La API puede guardar las URLs e identificadores Cloudinary que
+el panel le envíe.
 
 ---
 
@@ -245,4 +341,7 @@ Todos los endpoints están prefijados con `/api` (a excepción de la documentaci
 
 ## 🌐 Conexión con el Frontend
 
-La API tiene **CORS habilitado** por defecto para todos los orígenes (`*`), permitiendo que cualquier aplicación frontend (React, Next.js, Vue o HTML estático) pueda consumir los endpoints sin problemas de políticas de origen cruzado. Para producción, puedes restringir los dominios autorizados en la variable `CORS_ORIGINS` del archivo `.env`.
+En desarrollo local CORS permite los orígenes configurados en `.env.example`.
+En producción, `CORS_ORIGINS` debe listar únicamente los orígenes HTTPS exactos
+del frontend de Vercel, separados por comas. Cada URL de preview debe agregarse
+explícitamente; no se habilitan comodines en producción.

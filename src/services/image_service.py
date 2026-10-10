@@ -1,4 +1,5 @@
-from typing import Any, Dict, Optional, Tuple
+import logging
+from typing import Any, Dict, Optional
 
 import cloudinary
 import cloudinary.uploader
@@ -7,6 +8,7 @@ from src.config import Config
 
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif", "avif"}
 MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
+logger = logging.getLogger(__name__)
 
 
 class ImageUploadError(Exception):
@@ -62,7 +64,14 @@ class ImageService:
                 transformation=[{"quality": "auto", "fetch_format": "auto"}],
             )
         except Exception as exc:
-            raise ImageUploadError(f"No se pudo subir la imagen: {exc}", status_code=502)
+            logger.error(
+                "Falló la subida de una imagen a Cloudinary (%s).",
+                type(exc).__name__,
+            )
+            raise ImageUploadError(
+                "No se pudo subir la imagen a Cloudinary.",
+                status_code=502,
+            ) from None
 
         return {
             "image_url": result["secure_url"],
@@ -77,5 +86,8 @@ class ImageService:
         try:
             _configure()
             cloudinary.uploader.destroy(public_id)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "No se pudo eliminar la imagen de Cloudinary (%s).",
+                type(exc).__name__,
+            )
